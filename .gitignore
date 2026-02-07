@@ -1,0 +1,18 @@
+# --- SCC-ALAR .gitignore ---
+
+# Environment & System
+__pycache__/
+.env
+.venv
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints
+
+# DO NOT ignore .keras, .h5, .npy, .parquet as they are requested for the repo
+# However, we still ignore large ZIP files and raw datasets
+*.zip
+dataset/
+data/
+ham10000/
