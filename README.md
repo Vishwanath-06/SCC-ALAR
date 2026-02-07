@@ -73,9 +73,7 @@ A stratified split preserved class proportions:
 ## Class Imbalance Handling
 To mitigate dominance of the **nv** class, inverse square-root class weighting was applied:
 
-\[
-w_c = \frac{1}{\sqrt{f_c}}
-\]
+$ w_c = \frac{1}{\sqrt{f_c}} $
 
 | Class | Weight |
 | :--- | :---: |
