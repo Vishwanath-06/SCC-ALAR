@@ -75,6 +75,7 @@ To mitigate dominance of the **nv** class, inverse square-root class weighting w
 
 $ w_c = \frac{1}{\sqrt{f_c}} $
 
+
 | Class | Weight |
 | :--- | :---: |
 | df | 9.303 |
