@@ -1,99 +1,203 @@
-# SCC-ALAR(Skin Cancer Classifier using Advanced Learning Architectures)
-## Project Metadata
+# SCC-ALAR: Skin Cancer Classifier using Advanced Learning Architectures
 
-## Model Architectures
-- **Primary Model:** DenseNet121 (Baseline)
-- **Secondary Architectures:** EfficientNet (B0, B3), Custom CNN
-- **Hybrid Modules:** Transformer Encoders, XGBoost Classifiers
+| Category | Specification |
+| :--- | :--- |
+| **Primary Model** | DenseNet121 (Baseline) |
+| **Hybrid Modules** | Transformer Encoders, XGBoost |
+| **Environment** | Kaggle (Dual Tesla T4 GPUs, 16GB VRAM) |
+| **Frameworks** | TensorFlow 2.19.0, Keras, XGBoost |
+| **Primary Metric** | Macro-F1 Score |
 
-## Dataset
-- **Name:** HAM10000  
-- **Description:** 10,015 Dermoscopic Images
+---
 
-## Frameworks & Libraries
-- TensorFlow 2.19.0  
-- Keras  
-- Scikit-learn  
-- XGBoost  
+## Overview
+SCC-ALAR is a systematic study of convolutional and hybrid deep learning architectures for multi-class skin lesion classification using the **HAM10000** dataset. The project emphasizes **balanced evaluation**, rigorous ablation studies, and clinically relevant performance under extreme class imbalance.
 
-## Environment
-- **Platform:** Kaggle Notebooks  
-- **Compute:** Dual NVIDIA Tesla T4 GPUs  
-- **GPU Memory:** 16 GB VRAM  
-- **Runtime:** Python 3.12.12  
-- **Storage:** Kaggle Input Datasets (HAM10000)
+---
 
-## Evaluation Focus
-- **Primary Metric:** Macro-F1 Score (balanced class performance)
+## Dataset Description
+All experiments were conducted on the **HAM10000** (Human Against Machine with 10000 training images) dataset, a standard benchmark for dermoscopic image analysis. The dataset contains **10,015** images across seven diagnostic categories.
 
+### Diagnostic Categories
+- **akiec** – Actinic keratoses  
+- **bcc** – Basal cell carcinoma  
+- **bkl** – Benign keratosis-like lesions  
+- **df** – Dermatofibroma  
+- **mel** – Melanoma  
+- **nv** – Melanocytic nevi  
+- **vasc** – Vascular lesions  
 
-## Reproducibility & Environment
-All experiments were developed and executed on the Kaggle platform to ensure consistent hardware acceleration and environment stability.
+### Overall Class Distribution
+| Class | Image Count |
+| :--- | :---: |
+| nv | 6,705 |
+| mel | 1,113 |
+| bkl | 1,099 |
+| bcc | 514 |
+| akiec | 327 |
+| vasc | 142 |
+| df | 115 |
+| **Total** | **10,015** |
 
-- **Accelerator:** NVIDIA Tesla T4  
-- **GPU Configuration:** 2 × Tesla T4  
+---
 
+## Data Preprocessing
+- RGB conversion  
+- Resize to **224 × 224**  
+- Pixel normalization to [0, 1]  
 
-## Technical Implementation Details
+Images were organized in a directory-based structure and loaded using TensorFlow’s `image_dataset_from_directory`.
 
-### Optimization Policy
-- Enabled `mixed_float16` global policy to accelerate training on Tesla T4 GPUs.
+---
 
-### Hyperparameters
-- **Learning Rate (Head Training):** 1e-4  
-- **Learning Rate (Fine-tuning):** 1e-5  
-- **Fine-tuning Strategy:** Unfroze the top 40% of backbone layers after initial head convergence.
+## Dataset Splitting Strategy
+A stratified split preserved class proportions:
+- **70%** Training  
+- **15%** Validation  
+- **15%** Test  
 
-### XGBoost Configuration
-- **Objective:** `multi:softprob`  
-- **Estimators:** 300  
-- **Learning Rate:** 0.05  
-- **Input Features:** 256-dimensional embeddings extracted from Transformer Encoder
+### Split Statistics
+| Class | Training | Validation | Test |
+| :--- | :---: | :---: | :---: |
+| nv | 4,693 | 1,006 | 1,006 |
+| mel | 779 | 167 | 167 |
+| bkl | 769 | 165 | 165 |
+| bcc | 360 | 77 | 77 |
+| akiec | 229 | 49 | 49 |
+| vasc | 99 | 21 | 22 |
+| df | 81 | 17 | 17 |
+| **Total** | **7,010** | **1,502** | **1,503** |
 
+---
+
+## Class Imbalance Handling
+To mitigate dominance of the **nv** class, inverse square-root class weighting was applied:
+
+\[
+w_c = \frac{1}{\sqrt{f_c}}
+\]
+
+| Class | Weight |
+| :--- | :---: |
+| df | 9.303 |
+| vasc | 8.415 |
+| akiec | 5.533 |
+| bcc | 4.413 |
+| bkl | 3.019 |
+| mel | 3.000 |
+| nv | 1.222 |
+
+---
 
 ## Hybrid Architecture Logic
+1. **DenseNet121 Backbone**  
+   Extracts a `7 × 7 × 1024` feature map.
 
-1. **Backbone**  
-   - DenseNet121 extracts a `7 × 7 × 1024` feature map.
-
-2. **Tokenizer**  
-   - Feature map is flattened into 49 tokens.  
-   - Tokens are projected into a 256-dimensional embedding space.
+2. **Tokenization**  
+   Feature map flattened into 49 tokens and projected to 256 dimensions.
 
 3. **Transformer Encoder**  
-   - 2-layer Transformer Encoder  
+   - 2 layers  
    - 4 attention heads  
-   - Models global spatial dependencies between lesion regions.
+   - Models global spatial relationships.
 
-4. **Classification Head**  
-   - Transformer features are pooled and passed to:
-     - An MLP classifier **or**
-     - An XGBoost classifier
+4. **Classifier Head**  
+   - MLP **or** XGBoost using extracted embeddings.
 
+*(Architecture diagram recommended here for visualization.)*
 
-## Pre-extracted Embeddings
+---
 
-- **Directory:** `densenet+trnsfrmr_embeddings/`
-- **Embedding Size:** 256 dimensions
+## Evaluation Metrics
+- **Accuracy:** Overall correctness (biased toward majority class)  
+- **Macro-F1 (Primary):** Equal weighting across all classes  
 
-### Storage Formats
-- `.parquet` — efficient tabular data loading  
-- `.npy` — fast matrix-based operations
+---
 
-### Usage
-These embeddings enable rapid experimentation with downstream classifiers (e.g., XGBoost) without re-computing CNN or Transformer gradients.
+## CNN Benchmarking Results
+| Model | Test Accuracy | Test Macro-F1 |
+| :--- | :---: | :---: |
+| **DenseNet121** | **0.7864** | **0.6029** |
+| EfficientNetB0 | 0.6700 | 0.1242 |
+| EfficientNetB3 | 0.6487 | 0.1476 |
+| Custom CNN | 0.6660 | 0.3314 |
 
-## REPOSITORY STRUCTURE
+DenseNet121 clearly established itself as the strongest baseline.
+
+---
+
+## Detailed Performance Analysis (DenseNet121)
+| Class | Precision | Recall | F1-Score |
+| :--- | :---: | :---: | :---: |
+| nv | 0.90 | 0.90 | 0.90 |
+| vasc | 0.83 | 0.68 | 0.75 |
+| bcc | 0.59 | 0.73 | 0.62 |
+| bkl | 0.60 | 0.62 | 0.61 |
+| mel | 0.52 | 0.49 | 0.50 |
+| df | 0.88 | 0.29 | 0.43 |
+| akiec | 0.43 | 0.37 | 0.40 |
+
+---
+
+## Hybrid Models and Ablation Study
+| Architecture | Test Accuracy | Test Macro-F1 |
+| :--- | :---: | :---: |
+| **DenseNet121 (Baseline)** | **0.7864** | **0.6029** |
+| CNN → Transformer → XGBoost | 0.7731 | 0.5619 |
+| CNN → Transformer → MLP | 0.7618 | 0.5427 |
+| DenseNet → XGBoost | 0.7851 | 0.5131 |
+
+Hybrid architectures did **not** outperform the CNN baseline, indicating overfitting or loss of spatial inductive bias.
+
+---
+
+## Repository Structure
 ```text
-├── assets/                        # Generated plots and visualization script
-├── densenet+trnsfrmr_embeddings/  # Pre-extracted features (Parquet/NPY)
+├── assets/
+├── densenet+trnsfrmr_embeddings/
+├──densenet_embeddings/
 ├── experiment.ipynb
-├── final_models_bundle/           # Trained .keras and .h5 model files
+├── final_models_bundle/
 │   ├── M1_DenseNet121_Classifier
 │   ├── M2_DenseNet121_Backbone
 │   ├── M3_CNN_Transformer_Encoder
 │   └── M4_CNN_Transformer_MLP
-└── README.md                      # Project documentation
+└── README.md
+```
+
+## 🚀 Quick Start
+This repository uses **Git LFS** to store model weights and embeddings.
+
+### Clone the Repository
+```bash
+git clone https://github.com/YOUR_USERNAME/SCC-ALAR.git
+cd SCC-ALAR
+````
+
+### Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### Pull Git LFS Files
+
+```bash
+git lfs pull
+```
+## 🛠️ Usage Example
+
+```python
+from tensorflow import keras
+import numpy as np
+
+# Load the primary classifier
+model = keras.models.load_model(
+    "final_models_bundle/M1_DenseNet121_Classifier/densenet121_classifier.keras"
+)
+
+# Prediction (expects a 224×224 RGB image normalized to [0, 1])
+# predictions = model.predict(preprocessed_image)
 ```
 ### 1. Dataset Description
 All experiments were conducted on the **HAM10000** (Human Against Machine with 10000 training images) skin lesion dataset, a widely used benchmark for dermoscopic image classification. The dataset consists of **10,015** dermoscopic images categorized into seven diagnostic classes, representing both benign and malignant skin lesions.
@@ -175,7 +279,8 @@ Given the dominance of the **nv** class, explicit imbalance handling was require
 #### 5.2 Class Weighting Strategy
 Class weights were computed using an inverse square-root frequency scheme:
 
-$$w_c = \frac{1}{\sqrt{f_c}}$$
+$ w_c = \frac{1}{\sqrt{f_c}} $
+
 
 **Table 3: Computed Class Weights for Training**
 | Class | Computed Weight |
